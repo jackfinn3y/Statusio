@@ -4,6 +4,8 @@
 
 A tiny, self-hosted Stremio add-on that shows your **premium status & days remaining** for multiple debrid providers as a single **info card** in the **Streams** tab.
 
+**Note:** *Statusio* will run on a server soon, stay tuned.
+
 ---
 
 ## Table of Contents
@@ -36,7 +38,7 @@ It runs locally—**no remote server required**.
 
 ### Screenshot
 
-![Statusio](./Real-Debrid%20Status.png)
+![Statusio](./Statusio.png)
 
 *(Example layout shown; provider list & text update dynamically.)*
 
@@ -200,7 +202,7 @@ set AD_KEY=abc && set PM_KEY=pm123 && node index.js
 
 - 🟡 **Warning** — **≤ 14 days**
 
-- 🟠 **Critical — **≤ 3 days**
+- 🟠 **Critical** — **≤ 3 days**
 
 - 🔴 **Expired** — **0 days** or not premium
 
@@ -224,9 +226,9 @@ set DL_KEY=
 cd "C:\Users\a1337user\Desktop\Stremio Addons\Development\Statusio"
 set RD_TOKEN=PASTE_CORRECT_TOKEN_HERE && node index.js
 ```
-4. **I Stremio looks stale**
+4. **If Stremio looks stale**
 - Uninstall the add-on and reinstall via URL, **or**
-- Uninstall the add-on and reinstall via URL, or
+- Bump manifest.version in index.js (e.g., 1.0.2 → 1.0.3) and restart Node.
 
 
 ---
@@ -283,7 +285,7 @@ http://127.0.0.1:7010/manifest.json
 
 - Developed by **A1337User**
 
-Built with **stremio-addon-sdk** and **node-fetch**
+- Built with **stremio-addon-sdk** and **node-fetch**
 
 
 
