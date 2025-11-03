@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/Statusio.png" width="180" alt="Statusio Title">
+  <img src="assets/Statusio.png" width="512" alt="Statusio Title">
 </p> 
 
 ---
