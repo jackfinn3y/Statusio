@@ -3,11 +3,11 @@
 // Providers: Real-Debrid, AllDebrid, Premiumize, TorBox, Debrid-Link
 // Features: Config UI, per-provider tokens, demo mode, caching, logo in manifest
 //
-// ⚠️ Node/ESM note:
-//   - Use Node 18+ and set { "type": "module" } in package.json
-//   - Install deps:  npm i stremio-addon-sdk node-fetch
-//   - Run:           RD_TOKEN=xxxx npm start  (or: node index.js)
-//   - Addon URL:     http://127.0.0.1:7042/manifest.json
+// Node setup:
+//   - package.json: { "type": "module", "scripts": { "start": "node index.js" } }
+//   - npm i stremio-addon-sdk node-fetch
+//   - Run locally:  set RD_TOKEN=XXXX && npm start
+//   - Manifest URL: http://127.0.0.1:7042/manifest.json
 // ============================================================================
 
 import sdk from "stremio-addon-sdk";
@@ -64,15 +64,16 @@ const getCache = (key) => {
 };
 
 // ----------------------------- Quotes --------------------------------------
-// 14+ days (OK) — include ~30 (smart, funny, + a few "work while watching")
+
+// 14+ days (OK)
 const QUOTES_OK = [
-  // Work-while-watching (5)
+  // work / productivity vibes
   "Grind & binge",
   "Work n' watch",
   "Work hard, play harder",
   "All in one",
   "Watch it all",
-  // Short zingers (10 micro)
+  // micro one-liners
   "Plot twist: me",
   "Popcorn is needed",
   "Sequel my life",
@@ -98,6 +99,19 @@ const QUOTES_OK = [
   "Therapy, but with dragons.",
   "Stretch, sip, stream.",
   "Zoom out, zone in.",
+  "One more can't hurt... right?",
+  "Am I doomscrolling on TV?",
+  "I wanna know what happened next...",
+  "Just one season.",
+  "Sleep is overrated.",
+  "Cliffhanger got me.",
+  "I can quit… later.",
+  "This is self-care.",
+  "Oops, next ep started.",
+  "Brain: just one more.",
+  "Plot > responsibilities.",
+  "We roll credits at 3AM.",
+  "I live here now.",
   "Let the credits roll."
 ];
 
@@ -148,14 +162,14 @@ const QUOTES_EXPIRED = [
   "Fix the sub, then binge.",
   "Snack break until renew.",
   "Epic… after renewal.",
-  "Re-subscribe to continue.",
+  "Re-subscribe to continue."
 ];
 
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 // --------------------------- Providers -------------------------------------
 // Each returns:
-// { name, premium: true|false|null, daysLeft: number|null, untilISO: string|null, username?: string, note?: string }
+// { name, premium: true|false|null, daysLeft, untilISO, username?: string, note?: string }
 
 async function pRealDebrid({ token, fetchImpl = fetch }) {
   const name = "Real-Debrid";
@@ -173,7 +187,7 @@ async function pRealDebrid({ token, fetchImpl = fetch }) {
 
     if (j.expiration) {
       const expNum = Number(j.expiration);
-      if (Number.isFinite(expNum) && expNum > 1000000000) {
+      if (Number.isFinite(expNum) && expNum > 1_000_000_000) {
         const out = daysLeftFromEpochSec(expNum);
         days = out.days; untilISO = out.untilISO;
       } else {
@@ -237,7 +251,6 @@ async function pPremiumize({ key, useOAuth = false, fetchImpl = fetch }) {
 
     const out = daysLeftFromEpochSec(j.premium_until || 0);
     const isPrem = out.days > 0;
-    // Premiumize doesn't expose username here; show customer_id as fallback tag if wanted
     const username = j?.customer_id ? String(j.customer_id) : null;
 
     return isPrem
@@ -298,8 +311,8 @@ async function pDebridLink({ key, authScheme = "Bearer", endpoint = "https://deb
 
     const secs = Number(j.value.premiumLeft || 0);
     const out = secs > 0 ? daysLeftFromDurationSec(secs) : { days: 0, untilISO: null };
-
     const username = j?.value?.username || null;
+
     if (out.days > 0) return { name, premium: true, daysLeft: out.days, untilISO: out.untilISO, username };
     return { name, premium: false, daysLeft: 0, untilISO: null, username, note: `accountType=${j.value.accountType ?? "?"}` };
   } catch (e) {
@@ -328,7 +341,6 @@ function demoResults(profile = "all_active") {
 }
 
 // --------------------------- Rendering -------------------------------------
-// Status selection + quote bucket
 function statusInfo(days) {
   if (days <= 0) return { mark: "🔴 Status: Expired", bucket: QUOTES_EXPIRED };
   if (days <= 3) return { mark: "🟠 Status: Critical", bucket: QUOTES_CRIT };
@@ -339,14 +351,17 @@ function statusInfo(days) {
 // One card per provider, max 8 lines including separators
 function renderProviderCard(r) {
   const service = r.name;
-  const user = r?.username ? `${String(r.username)}` : "—";
-  const days = Number.isFinite(r.daysLeft) && r.daysLeft !== null ? r.daysLeft : (r.premium ? "—" : 0);
+  const user = r?.username ? `@${String(r.username)}` : "—";
+  const days =
+    Number.isFinite(r.daysLeft) && r.daysLeft !== null
+      ? r.daysLeft
+      : (r.premium ? "—" : 0);
   const dateStr = r.untilISO ? isoDate(r.untilISO) : (r.premium ? "—" : "N/A");
 
-  const { mark, bucket } = statusInfo(Number(days === "—" ? 9999 : days));
+  const numericDays = typeof days === "number" ? days : 9999;
+  const { mark, bucket } = statusInfo(numericDays);
   const quote = pick(bucket);
 
-  // Title per provider
   let titlePrefix = "🟢 OK";
   if (mark.startsWith("🟡")) titlePrefix = "🟡 Warning";
   else if (mark.startsWith("🟠")) titlePrefix = "🟠 Critical";
@@ -354,16 +369,15 @@ function renderProviderCard(r) {
 
   const title = `${titlePrefix} — ${service}`;
 
-  // Exactly 8 lines:
   const lines = [
-    "───────────────",
+    "———————————————",
     `🤝 Service: ${service}`,
     `👤 ${user}`,
     `⭐ Premium until: ${dateStr}`,
     `⏳ Days remaining: ${days} D`,
     `${mark}`,
     `💬 ${quote}`,
-    "───────────────"
+    "———————————————"
   ].join("\n");
 
   return { title, description: lines };
@@ -371,8 +385,8 @@ function renderProviderCard(r) {
 
 // --------------------------- Manifest & Config ------------------------------
 const manifest = {
-  id: "a1337user.debridio.multi",
-  version: "1.0.0",
+  id: "a1337user.statusio.multi",
+  version: "1.0.6",
   name: "Statusio",
   description: "Shows premium status & days remaining across multiple debrid providers.",
   resources: ["stream"],
@@ -392,10 +406,11 @@ const manifest = {
         { value: "torbox",     name: "TorBox" },
         { value: "debridlink", name: "Debrid-Link" },
       ],
-      multiple: true,
+      // single select (Stremio shows dropdown)
+      multiple: false,
       required: false
     },
-    { name: "cache_minutes", type: "number", default: 10, title: "Cache Minutes (default 10)" },
+    { name: "cache_minutes", type: "number", default: 45, title: "Cache Minutes (default 45)" },
 
     // Tokens / keys
     { name: "rd_token", type: "text", title: "Real-Debrid Token (Bearer)" },
@@ -412,9 +427,7 @@ const manifest = {
       default: "apikey"
     },
     { name: "tb_token", type: "text", title: "TorBox Token (Bearer)" },
-    {
-      name: "dl_key", type: "text", title: "Debrid-Link API Key/Token"
-    },
+    { name: "dl_key",  type: "text", title: "Debrid-Link API Key/Token" },
     {
       name: "dl_auth",
       type: "select",
@@ -425,9 +438,12 @@ const manifest = {
       ],
       default: "Bearer"
     },
-    { name: "dl_endpoint", type: "text", title: "Debrid-Link Endpoint Override", default: "https://debrid-link.com/api/account/infos" },
-
-    // Demo mode
+    {
+      name: "dl_endpoint",
+      type: "text",
+      title: "Debrid-Link Endpoint Override",
+      default: "https://debrid-link.com/api/account/infos"
+    },
     {
       name: "demo_mode",
       type: "select",
@@ -448,17 +464,25 @@ const builder = new addonBuilder(manifest);
 builder.defineStreamHandler(async (args) => {
   const cfg = args?.config || {};
 
-  // ENV fallback (lets you run with only RD token from CMD)
+  // ENV fallback (local testing with RD_TOKEN)
   if (!cfg.rd_token && process.env.RD_TOKEN) {
     cfg.rd_token = process.env.RD_TOKEN;
-    if (!Array.isArray(cfg.providers_enabled) || cfg.providers_enabled.length === 0) {
-      cfg.providers_enabled = ["realdebrid"];
-    }
+    if (!cfg.providers_enabled) cfg.providers_enabled = "realdebrid";
   }
 
-  const cacheMin = Number.isFinite(cfg.cache_minutes) ? Math.max(1, cfg.cache_minutes) : 10;
+  const cacheMin = Number.isFinite(cfg.cache_minutes) ? Math.max(1, cfg.cache_minutes) : 45;
 
-  const enabled = (cfg.providers_enabled || []).map(v => String(v).toLowerCase()).sort();
+  // NEW: support string OR array for providers_enabled
+  const rawProviders = cfg.providers_enabled;
+  let enabled;
+  if (Array.isArray(rawProviders)) {
+    enabled = rawProviders.map((v) => String(v).toLowerCase());
+  } else if (rawProviders) {
+    enabled = [String(rawProviders).toLowerCase()];
+  } else {
+    enabled = [];
+  }
+
   const cacheKey = [
     enabled.join(","),
     `rd:${redact(cfg.rd_token)}`,
@@ -478,7 +502,10 @@ builder.defineStreamHandler(async (args) => {
         const jobs = [];
         if (enabled.includes("realdebrid")) jobs.push(pRealDebrid({ token: (cfg.rd_token || "").trim() }));
         if (enabled.includes("alldebrid"))  jobs.push(pAllDebrid({ key: (cfg.ad_key || "").trim() }));
-        if (enabled.includes("premiumize")) jobs.push(pPremiumize({ key: (cfg.pm_key || "").trim(), useOAuth: (cfg.pm_auth || "apikey") === "oauth" }));
+        if (enabled.includes("premiumize")) jobs.push(pPremiumize({
+          key: (cfg.pm_key || "").trim(),
+          useOAuth: (cfg.pm_auth || "apikey") === "oauth"
+        }));
         if (enabled.includes("torbox"))     jobs.push(pTorBox({ token: (cfg.tb_token || "").trim() }));
         if (enabled.includes("debridlink")) jobs.push(pDebridLink({
           key: (cfg.dl_key || "").trim(),
@@ -493,7 +520,7 @@ builder.defineStreamHandler(async (args) => {
         "———————————————",
         "⚠️ Unable to fetch debrid status",
         String(e.message || e),
-        "———————————————",
+        "———————————————"
       ].join("\n");
       return {
         streams: [{
@@ -501,19 +528,15 @@ builder.defineStreamHandler(async (args) => {
           title: "⚠️ Status unavailable",
           description: lines,
           behaviorHints: { notWebReady: true },
-          externalUrl: "about:blank",
+          externalUrl: "about:blank"
         }],
         cacheMaxAge: 60
       };
     }
   }
 
-  // Build one stream per provider to respect 8-line limit per card
   const streams = [];
   for (const r of results) {
-    // If provider returned null (e.g., missing token), show a small notice card
-    if (r.premium === null && !r.username && !r.daysLeft && !r.untilISO && !r.note) continue;
-
     const card = renderProviderCard(r);
     streams.push({
       name: "🔐 Statusio",
@@ -524,11 +547,10 @@ builder.defineStreamHandler(async (args) => {
     });
   }
 
-  // If none, still show a default card
   if (streams.length === 0) {
     streams.push({
       name: "🔐 Statusio",
-      title: "⚠️ No providers configured",
+      title: "⚠️ Add a token in Configure",
       description: [
         "———————————————",
         "Add a token in Configure:",
