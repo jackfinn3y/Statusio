@@ -654,10 +654,10 @@ function renderProviderCard(r) {
 }
 
 // --------------------------- Manifest & Config ------------------------------
-// Sync version with your package.json (e.g. 1.1.0)
+// Sync version with your package.json (e.g. 1.1.1)
 const manifest = {
   id: "a1337user.statusio.multi.simple",
-  version: "1.1.0",
+  version: "1.1.1",
   name: "Statusio",
   description:
     "Shows premium status & days remaining across multiple debrid providers.",
@@ -804,7 +804,6 @@ builder.defineStreamHandler(async (args) => {
             name: "🔐 Statusio",
             title: "⚠️ Status unavailable",
             description: lines,
-            behaviorHints: { notWebReady: true },
             externalUrl: "about:blank"
           }
         ],
@@ -820,7 +819,6 @@ builder.defineStreamHandler(async (args) => {
       name: "🔐 Statusio",
       title: card.title,
       description: card.description,
-      behaviorHints: { notWebReady: true },
       externalUrl: "about:blank"
     });
   }
@@ -842,7 +840,6 @@ builder.defineStreamHandler(async (args) => {
           "• Debrid-Link (dl_key)",
           LINE
         ].join("\n"),
-        behaviorHints: { notWebReady: true },
         externalUrl: "about:blank"
       });
     } else {
@@ -862,7 +859,6 @@ builder.defineStreamHandler(async (args) => {
           "Check that your tokens are valid and saved in Configure.",
           LINE
         ].join("\n"),
-        behaviorHints: { notWebReady: true },
         externalUrl: "about:blank"
       });
     }
