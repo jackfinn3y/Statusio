@@ -33,7 +33,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Solid divider line for stream card formatting
 const LINE =
-  "────────────────────────────────────────────────────────────────";
+  "────────────────";
 
 const ceilDays = (ms) => Math.max(0, Math.ceil(ms / DAY_MS));
 const addMsToISO = (ms) => new Date(Date.now() + ms).toISOString();
@@ -875,4 +875,5 @@ builder.defineStreamHandler(async (args) => {
 // ------------------------------ Server -------------------------------------
 const PORT = Number(process.env.PORT || 7042);
 serveHTTP(builder.getInterface(), { port: PORT, hostname: "0.0.0.0" });
+
 console.log(`Statusio at http://127.0.0.1:${PORT}/manifest.json`);
