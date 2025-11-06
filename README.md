@@ -35,7 +35,7 @@ A tiny, Stremio add-on that shows your **premium status & days remaining** for *
 ## Overview
 This add-on renders a single **info card** in the **Streams** tab for movies/series/channel/tv indicating your debrid account status:
 
-- ✅ **OK** — active premium until *YYYY-MM-DD*
+- 🟢 **OK** — active premium until *YYYY-MM-DD*
 - 🟡 **Warning** — **≤ 14 days** remaining
 - 🟠 **Critical** — **≤ 3 days** remaining
 - 🔴 **Expired** — 0 days remaining (or not premium)
