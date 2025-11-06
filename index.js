@@ -34,7 +34,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // Solid divider line for stream card formatting
 const LINE = "────────────────";
 
-// Base URL for external link (hosted Statusio UI)
+// Base URL for external link fallback (hosted Statusio UI)
 const STATUS_BASE_URL =
   process.env.STATUS_BASE_URL || "https://statusio.elfhosted.com";
 
@@ -657,27 +657,75 @@ function renderProviderCard(r) {
 }
 
 // --------------------------- External URL Builder ---------------------------
-// Build a fully encoded external URL pointing at hosted Statusio UI.
-// Example: https://statusio.elfhosted.com/status?provider=Real-Debrid&user=foo&days=10&premium=1
-function buildExternalUrl(result) {
+
+// Direct site URLs per provider
+const PROVIDER_URLS = {
+  "Real-Debrid": "https://real-debrid.com/",
+  "TorBox": "https://torbox.app/",
+  Premiumize: "https://www.premiumize.me/",
+  AllDebrid: "https://alldebrid.com/",
+  "Debrid-Link": "https://debrid-link.com/"
+};
+
+// Priority for picking a single provider when multiple are enabled
+// (Real-Debrid → TorBox → Premiumize → AllDebrid → Debrid-Link)
+const PRIORITY_ORDER = [
+  "realdebrid",
+  "torbox",
+  "premiumize",
+  "alldebrid",
+  "debridlink"
+];
+
+// Build external URL based on provider result + enabled set
+function buildExternalUrl(result, enabled) {
   try {
-    const base = new URL(STATUS_BASE_URL);
-    // adjust this path if your frontend expects something else
-    base.pathname = "/status";
+    const name = result?.name || "";
+    const lower = name.toLowerCase();
 
-    if (result?.name) base.searchParams.set("provider", result.name);
-    if (result?.username)
-      base.searchParams.set("user", String(result.username));
+    // 1) Direct match by provider name on the card
+    if (lower.includes("real-debrid")) return PROVIDER_URLS["Real-Debrid"];
+    if (lower.includes("torbox")) return PROVIDER_URLS["TorBox"];
+    if (lower.includes("premiumize")) return PROVIDER_URLS["Premiumize"];
+    if (lower.includes("alldebrid") || lower.includes("all-debrid"))
+      return PROVIDER_URLS["AllDebrid"];
+    if (lower.includes("debrid-link") || lower.includes("debrid link"))
+      return PROVIDER_URLS["Debrid-Link"];
 
-    if (Number.isFinite(result?.daysLeft))
-      base.searchParams.set("days", String(result.daysLeft));
+    // 2) Fallback: pick first enabled provider by priority
+    for (const key of PRIORITY_ORDER) {
+      if (enabled?.[key]) {
+        switch (key) {
+          case "realdebrid":
+            return PROVIDER_URLS["Real-Debrid"];
+          case "torbox":
+            return PROVIDER_URLS["TorBox"];
+          case "premiumize":
+            return PROVIDER_URLS["Premiumize"];
+          case "alldebrid":
+            return PROVIDER_URLS["AllDebrid"];
+          case "debridlink":
+            return PROVIDER_URLS["Debrid-Link"];
+        }
+      }
+    }
 
-    if (typeof result?.premium === "boolean")
-      base.searchParams.set("premium", result.premium ? "1" : "0");
+    // 3) Last resort: fall back to hosted UI if set, otherwise about:blank
+    if (STATUS_BASE_URL) {
+      const base = new URL(STATUS_BASE_URL);
+      base.pathname = "/status";
+      if (result?.name) base.searchParams.set("provider", result.name);
+      if (result?.username)
+        base.searchParams.set("user", String(result.username));
+      if (Number.isFinite(result?.daysLeft))
+        base.searchParams.set("days", String(result.daysLeft));
+      if (typeof result?.premium === "boolean")
+        base.searchParams.set("premium", result.premium ? "1" : "0");
+      if (result?.untilISO) base.searchParams.set("until", result.untilISO);
+      return base.toString();
+    }
 
-    if (result?.untilISO) base.searchParams.set("until", result.untilISO);
-
-    return base.toString(); // encoded safely
+    return "about:blank";
   } catch (e) {
     console.warn("[Statusio] Failed to build externalUrl:", e.message);
     return "about:blank";
@@ -688,7 +736,7 @@ function buildExternalUrl(result) {
 // Sync version with your package.json
 const manifest = {
   id: "a1337user.statusio.multi.simple",
-  version: "1.1.4",
+  version: "1.1.5",
   name: "Statusio",
   description:
     "Shows premium status & days remaining across multiple debrid providers.",
@@ -700,7 +748,7 @@ const manifest = {
       idPrefixes: ["tt"]
     }
   ],
-  // Global fallback content types & idPrefixes (matches docs pattern)
+  // Global fallback content types & idPrefixes
   types: ["movie", "series", "channel", "tv"],
   idPrefixes: ["tt"],
 
@@ -749,10 +797,15 @@ const builder = new addonBuilder(manifest);
 // ---------------------------- Stream Handler -------------------------------
 builder.defineStreamHandler(async (args) => {
   // Helpful logging to see if Android TV actually hits us
-  console.log(
-    "[Statusio] stream request:",
-    JSON.stringify({ type: args?.type, id: args?.id }, null, 2)
-  );
+  const type = args?.type || "";
+  const id = String(args?.id || "");
+  console.log("[Statusio] stream request:", JSON.stringify({ type, id }, null, 2));
+
+  // Explicitly only handle Cinemeta-style IMDb IDs on all clients
+  if (!id || !id.startsWith("tt")) {
+    console.log("[Statusio] unsupported id, returning no streams:", id);
+    return { streams: [], cacheMaxAge: 60 };
+  }
 
   // raw config from Stremio – may be an object OR a JSON string
   const rawCfg = args?.config ?? {};
@@ -851,7 +904,8 @@ builder.defineStreamHandler(async (args) => {
             name: "🔐 Statusio",
             title: "⚠️ Status unavailable",
             description: lines,
-            externalUrl: "about:blank"
+            externalUrl: "about:blank",
+            behaviorHints: { notWebReady: true }
           }
         ],
         cacheMaxAge: 60
@@ -866,7 +920,11 @@ builder.defineStreamHandler(async (args) => {
       name: "🔐 Statusio",
       title: card.title,
       description: card.description,
-      externalUrl: buildExternalUrl(r)
+      externalUrl: buildExternalUrl(r, enabled),
+      behaviorHints: {
+        // Important for Android TV: this is *not* a direct video stream
+        notWebReady: true
+      }
     });
   }
 
@@ -887,7 +945,8 @@ builder.defineStreamHandler(async (args) => {
           "• Debrid-Link (dl_key)",
           LINE
         ].join("\n"),
-        externalUrl: "about:blank"
+        externalUrl: "about:blank",
+        behaviorHints: { notWebReady: true }
       });
     } else {
       streams.push({
@@ -906,7 +965,8 @@ builder.defineStreamHandler(async (args) => {
           "Check that your tokens are valid and saved in Configure.",
           LINE
         ].join("\n"),
-        externalUrl: "about:blank"
+        externalUrl: "about:blank",
+        behaviorHints: { notWebReady: true }
       });
     }
   }
