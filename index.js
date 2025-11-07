@@ -41,9 +41,9 @@ const STATUS_BASE_URL =
 // Provider website homepages (for smart routing)
 const PROVIDER_URL = {
   "Real-Debrid": "https://real-debrid.com/",
-  "TorBox": "https://torbox.app/",
-  "Premiumize": "https://www.premiumize.me/",
-  "AllDebrid": "https://alldebrid.com/",
+  TorBox: "https://torbox.app/",
+  Premiumize: "https://www.premiumize.me/",
+  AllDebrid: "https://alldebrid.com/",
   "Debrid-Link": "https://debrid-link.com/"
 };
 
@@ -711,10 +711,10 @@ function buildExternalUrl(result, tokens) {
 }
 
 // --------------------------- Manifest & Config ------------------------------
-// v1.1.7 — tighten manifest for Android TV: stream only, movie/series, "tt" ids
+// v1.1.8 — remove stream.type="other" for stricter platforms, keep movie/series only
 const manifest = {
   id: "a1337user.statusio.multi.simple",
-  version: "1.1.7",
+  version: "1.1.8",
   name: "Statusio",
   description:
     "Shows premium status & days remaining across multiple debrid providers.",
@@ -871,7 +871,6 @@ builder.defineStreamHandler(async (args) => {
             title: "⚠️ Status unavailable",
             description: lines,
             behaviorHints: { notWebReady: true },
-            type: "other",
             externalUrl: "about:blank"
           }
         ],
@@ -887,8 +886,7 @@ builder.defineStreamHandler(async (args) => {
       name: "🔐 Statusio",
       title: card.title,
       description: card.description,
-      behaviorHints: { notWebReady: true }, // key for info-only cards
-      type: "other", // optional but helps signal non-playable
+      behaviorHints: { notWebReady: true }, // info-only card
       externalUrl: buildExternalUrl(r, tokens)
     });
   }
@@ -911,7 +909,6 @@ builder.defineStreamHandler(async (args) => {
           LINE
         ].join("\n"),
         behaviorHints: { notWebReady: true },
-        type: "other",
         externalUrl: "about:blank"
       });
     } else {
@@ -932,7 +929,6 @@ builder.defineStreamHandler(async (args) => {
           LINE
         ].join("\n"),
         behaviorHints: { notWebReady: true },
-        type: "other",
         externalUrl: "about:blank"
       });
     }
