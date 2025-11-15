@@ -670,11 +670,336 @@ builder.defineStreamHandler(async (args) => {
   return { streams: finalStreams };
 });
 
-// ------------------------------ Server -------------------------------------
-const PORT = Number(process.env.PORT || 7042);
-serveHTTP(builder.getInterface(), { port: PORT, hostname: "0.0.0.0" });
-
-console.log(
-  `✅ Statusio v1.2.0 at http://127.0.0.1:${PORT}/manifest.json`
-);
-console.log(`⚠️  Now showing ONLY when critical (≤3 days) or expired.`);
+// ----------------------- Configuration UI HTML -----------------------------
+const CONFIG_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Statusio Configuration</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .header { text-align: center; margin-bottom: 30px; }
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+        }
+        h1 { color: #2d3748; font-size: 28px; margin-bottom: 10px; }
+        .subtitle { color: #718096; font-size: 14px; }
+        .form-group { margin-bottom: 25px; }
+        label {
+            display: block;
+            color: #2d3748;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .provider-label { display: flex; align-items: center; gap: 10px; }
+        .provider-logo {
+            width: 24px;
+            height: 24px;
+            object-fit: contain;
+            border-radius: 4px;
+            background: white;
+            padding: 2px;
+        }
+        input[type="text"], input[type="number"], select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            font-family: monospace;
+            background: white;
+        }
+        select {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            cursor: pointer;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .helper-text { font-size: 12px; color: #718096; margin-top: 5px; }
+        .button-group { display: flex; gap: 12px; margin-top: 30px; }
+        button {
+            flex: 1;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+        .btn-secondary { background: #e2e8f0; color: #2d3748; }
+        .btn-secondary:hover { background: #cbd5e0; }
+        .success-message {
+            background: #48bb78;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .addon-url {
+            background: #f7fafc;
+            border: 2px dashed #cbd5e0;
+            border-radius: 10px;
+            padding: 16px;
+            margin-top: 30px;
+            text-align: center;
+        }
+        .addon-url-label {
+            font-size: 12px;
+            color: #718096;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .url-display {
+            font-family: monospace;
+            font-size: 13px;
+            color: #2d3748;
+            word-break: break-all;
+            background: white;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+        .copy-btn {
+            padding: 8px 16px;
+            font-size: 14px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .copy-btn:hover { background: #5568d3; }
+        .section-divider {
+            border: none;
+            border-top: 2px solid #e2e8f0;
+            margin: 30px 0;
+        }
+        .section-title {
+            font-size: 18px;
+            color: #2d3748;
+            font-weight: 700;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .advanced-section {
+            background: #f7fafc;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        .advanced-title {
+            font-size: 14px;
+            color: #4a5568;
+            font-weight: 600;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        @media (max-width: 640px) {
+            .container { padding: 30px 20px; }
+            h1 { font-size: 24px; }
+            .button-group { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🔐</div>
+            <h1>Statusio Configuration</h1>
+            <p class="subtitle">Monitor your debrid service subscriptions</p>
+        </div>
+        <div id="successMessage" class="success-message">✓ Configuration saved successfully!</div>
+        <form id="configForm">
+            <div class="section-title">⚙️ General Settings</div>
+            <div class="form-group">
+                <label for="cache_minutes">Cache Duration (minutes)</label>
+                <input type="number" id="cache_minutes" name="cache_minutes" value="45" min="1" max="1440">
+                <div class="helper-text">How long to cache API responses (1-1440 minutes)</div>
+            </div>
+            <hr class="section-divider">
+            <div class="section-title">🌐 Debrid Services</div>
+            <div class="form-group">
+                <label for="rd_token">
+                    <span class="provider-label">
+                        <img src="https://fcdn.real-debrid.com/0831/images/logo.png" alt="Real-Debrid" class="provider-logo">
+                        Real-Debrid Token
+                    </span>
+                </label>
+                <input type="text" id="rd_token" name="rd_token" placeholder="Bearer token from Real-Debrid">
+                <div class="helper-text">Get from: Account Settings → API Token</div>
+            </div>
+            <div class="form-group">
+                <label for="ad_key">
+                    <span class="provider-label">
+                        <img src="https://cdn.alldebrid.com/lib/images/default/logo_alldebrid.png" alt="AllDebrid" class="provider-logo">
+                        AllDebrid API Key
+                    </span>
+                </label>
+                <input type="text" id="ad_key" name="ad_key" placeholder="API key from AllDebrid">
+                <div class="helper-text">Get from: Account Settings → API Key</div>
+            </div>
+            <div class="form-group">
+                <label for="pm_key">
+                    <span class="provider-label">
+                        <img src="https://www.premiumize.me/icon_normal.svg" alt="Premiumize" class="provider-logo">
+                        Premiumize Key
+                    </span>
+                </label>
+                <input type="text" id="pm_key" name="pm_key" placeholder="API key or access token">
+                <div class="helper-text">Get from: Account Settings → API Key</div>
+            </div>
+            <div class="form-group">
+                <label for="tb_token">
+                    <span class="provider-label">
+                        <img src="https://avatars.githubusercontent.com/u/144096078?s=280&v=4" alt="TorBox" class="provider-logo">
+                        TorBox Token
+                    </span>
+                </label>
+                <input type="text" id="tb_token" name="tb_token" placeholder="Bearer token from TorBox">
+                <div class="helper-text">Get from: Account Settings → API Token</div>
+            </div>
+            <div class="form-group">
+                <label for="dl_key">
+                    <span class="provider-label">
+                        <img src="https://debrid-link.com/img/brand/dl-white-blue.svg" alt="Debrid-Link" class="provider-logo">
+                        Debrid-Link Key
+                    </span>
+                </label>
+                <input type="text" id="dl_key" name="dl_key" placeholder="API key from Debrid-Link">
+                <div class="helper-text">Get from: Account Settings → API Key</div>
+            </div>
+            <div class="advanced-section">
+                <div class="advanced-title">🔧 Advanced: Debrid-Link Options</div>
+                <div class="form-group">
+                    <label for="dl_auth">Authentication Scheme</label>
+                    <select id="dl_auth" name="dl_auth">
+                        <option value="Bearer">Bearer (Recommended)</option>
+                        <option value="query">Query Parameter</option>
+                    </select>
+                    <div class="helper-text">How to send the API key to Debrid-Link</div>
+                </div>
+                <div class="form-group">
+                    <label for="dl_endpoint">Custom API Endpoint</label>
+                    <input type="text" id="dl_endpoint" name="dl_endpoint" placeholder="https://debrid-link.com/api/account/infos">
+                    <div class="helper-text">Leave empty to use default endpoint</div>
+                </div>
+            </div>
+            <div class="button-group">
+                <button type="button" class="btn-secondary" onclick="clearForm()">Clear All</button>
+                <button type="submit" class="btn-primary">Generate Addon URL</button>
+            </div>
+        </form>
+        <div class="addon-url" id="addonUrlSection" style="display: none;">
+            <div class="addon-url-label">Your Addon URL</div>
+            <div class="url-display" id="addonUrl"></div>
+            <button class="copy-btn" onclick="copyUrl()">📋 Copy URL</button>
+            <div class="helper-text" style="margin-top: 10px;">
+                Paste this URL in Stremio: Settings → Addons → Add Addon
+            </div>
+        </div>
+    </div>
+    <script>
+        const BASE_URL = window.location.origin;
+        window.addEventListener('DOMContentLoaded', () => {
+            const saved = JSON.parse(localStorage.getItem('statusioConfig') || '{}');
+            Object.keys(saved).forEach(key => {
+                const input = document.getElementById(key);
+                if (input) input.value = saved[key];
+            });
+        });
+        document.getElementById('configForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const config = {};
+            for (let [key, value] of formData.entries()) {
+                if (value.trim()) {
+                    config[key] = value.trim();
+                }
+            }
+            localStorage.setItem('statusioConfig', JSON.stringify(config));
+            const configEncoded = btoa(JSON.stringify(config));
+            const addonUrl = BASE_URL + '/' + configEncoded + '/manifest.json';
+            document.getElementById('addonUrl').textContent = addonUrl;
+            document.getElementById('addonUrlSection').style.display = 'block';
+            const successMsg = document.getElementById('successMessage');
+            successMsg.style.display = 'block';
+            setTimeout(() => { successMsg.style.display = 'none'; }, 3000);
+            document.getElementById('addonUrlSection').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+        function clearForm() {
+            if (confirm('Clear all saved configuration?')) {
+                localStorage.removeItem('statusioConfig');
+                document.getElementById('configForm').reset();
+                document.getElementById('addonUrlSection').style.display = 'none';
+            }
+        }
+        function copyUrl() {
+            const url = document.getElementById('addonUrl').textContent;
+            navigator.clipboard.writeText(url).then(() => {
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = '✓ Copied!';
+                btn.style.background = '#48bb78';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.style.background = '#667eea';
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>`
