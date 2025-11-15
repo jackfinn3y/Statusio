@@ -1,7 +1,6 @@
 // ============================================================================
-// Statusio • Stremio Add-on (TV-Compatible v1.1.26)
-// Change: description = ONLY the per-field lines (no footer/thank-you/etc.)
-// Pattern: Ratings Aggregator–style (simple text, includes url + externalUrl)
+// Statusio • Stremio Add-on (TV-Compatible v1.2.0 - Critical/Expired Only)
+// Shows only when subscription is ≤3 days or expired
 // ============================================================================
 
 import sdk from "stremio-addon-sdk";
@@ -40,46 +39,6 @@ function daysLeftFromDurationSec(durationSec) {
   };
 }
 
-// ----------------------------- Quotes --------------------------------------
-
-// 14+ days (OK) — Work mode, smart/funny, short zingers
-const QUOTES_OK = [
-// Work-while-watching (5)
-  "Grind & binge time!", "Work n' watch time!", "Emails? Nah, more episodes.", "Multitask: cry + work.", "Boss on mute, show on blast!",
-
-// Short zingers (10 micro, <34 chars)
-  "Plot twist: me!", "Popcorn is needed!", "Sequel my life...", "Cue the chaos!", "Credits? Nope. Next.", "Spoiler: Need snacks.", "Villain = Bill time.", "*dramatic sip*", "Boom. Plot.",
-
-// Smart/funny (15+ punchy bangers) — old school + new school + cringey gold
-  "You earned this binge, champ", "Queue = life. Season 1 GO", "Adulting? Nah, captioning", "Meetings done, MOVIE ON", "Procrastination level: PRO", "Budget says: snacks > rent", "Tonight: couch + 47 episodes", "Couch just filed for PTO", "Microwave = trailer timer", "Main quest: DO NOT DISTURB", "Side quest: find the remote", "Therapy? Nah, dragons", "Stretch. Sip. Stream. Repeat.", "Zoom call over, ZONE IN", "One more ep… *famous last words*", "Doomscrolling, but on TV", "I NEED to know what happens!", "Just one ep… *lies to mirror*", "Sleep? What’s that?", "Cliffhanger holding me hostage", "I can stop… after this season", "Self-care = 3AM binge", "Oops, autoplay betrayed me", "Brain: one more. Body: 12 later", "Plot > rent > my GPA", "Credits? We don’t do that here", "I now live in Couchville", "Let credits roll… IN HELL", "Skipping intros = cardio", "Hydrate? I drink DRAMA", "Laundry? Drama waits for NO ONE", "Toilet break = Russian roulette", "Remote > my ex > my mom", "Binge now, regret at sunrise", "Spoilers = war crime", "Ctrl+Z my entire life pls", "My plants died for this binge", "3AM me: still watching", "Eyebags = plot armor", "Blink = miss the plot", "Snaccident in progress", "Chores? What chores?", "Plot holes > life holes", "Remote stuck to my hand", "Next ep = my religion", "Buffering = life coach", "Subtitles = reading cheat", "Season finale? Pain.", "Autoplay = evil genius", "Blanket burrito mode", "My butt’s gone numb", "Snacks > stock market", "Pause? Never heard", "Plot twist: I’m broke", "Streaming > streaming IRL", "Eye strain = trophy", "Rewind = time travel", "Volume 47 = normal", "Binge coma incoming", "Tomorrow me hates today me", "WiFi > oxygen", "Episode 1? Rookie numbers", "Netflix & actually chill", "Loading… like my life", "Remote wars = real wars", "Popcorn lung = real", "Couch dent = legacy",
-
-// Genre-specific zingers (<34 chars) — old school + new school + cringey
-  "Horror: heart attack free", "Sci-fi: beam me up, couch", "Rom-com: love? Nah, binge", "Drama: tears > tissues", "Action: boom in my room", "Comedy: LOL till I choke", "Thriller: plot twist pants", "Fantasy: dragons > deadlines", "True crime: guilty pleasure", "Anime: subs > dubs fight", "Reality TV: messier than me", "Docu: facts? Mind blown", "Superhero: cape on couch", "Mystery: who done it? Me", "Historical: time travel cheap",
-
-// Post-binge regrets (<34 chars) — hilarious + cringey
-  "What day is it again?", "Eyes: send help pls", "Sunlight? What's that?", "Productive? Never was", "Butt numb, soul empty", "Regret level: max", "Tomorrow me: furious", "Plants dead, me alive?", "Social life? Canceled", "Binge hangover hits", "Mirror: who are you?", "Chores piled like eps", "Wallet: snacks broke me", "Brain rot achieved", "Neck pain = trophy",
-
-// Tech glitch roasts (<34 chars) — edgy + funny
-  "Buffering… my life", "Ads: skip my existence", "WiFi ghosted me", "HD? More like huh?", "Autoplay? Evil overlord", "Error 404: fun not found", "Loading… forever alone", "Pixelated dreams", "Remote battery dead", "Stream lag = rage", "Subtitles glitchy mess", "App crash = my mood", "No signal? Apocalypse", "Update now? Hell no", "You're the Debrid Master"
-];
-
-// 14 days or less (warning) — funny/edgy nudge
-const QUOTES_WARN = [
-  "Renew before cliffhanger.", "Cheaper than snacks.", "Tiny fee, huge chill.", "Beat the ‘oops, expired’.", "Your future self says thanks.", "Renew now, binge later.", "Don’t pause the fun.", "Click. Renew. Continue.", "Keep calm, renew on.", "Roll credits on worry.", "Pay up or plot twist: pain", "Binge tax due, peasant", "Wallet lighter, soul fuller", "Renew or face the void", "Card declined? Big sad", "Couch demands tribute", "Subscription > therapy", "Click or cry at 99%", "Renewal = plot armor", "Don’t let the algorithm win"
-];
-
-// 3 days or less (critical) — urgent but still funny
-const QUOTES_CRIT = [
-  "Boss fight: renewal.", "Renew soon, it's coming!", "Please renew soon...", "Your time is almost up!", "Don't let your ISP catch on", "Two taps, all vibes.", "Renew = peace unlocked.", "Don’t lose the finale.", "Almost out—top up.", "3…2…renew.", "Tiny bill, big joy.", "Grab the lifeline.", "Save the weekend.", "Clock’s loud. Renew.", "Last ep loading… or not", "Buffering fate. Renew.", "Do it or doomscroll life", "Finale blocked. Pay up.", "Renew or rage quit", "Plot armor expiring"
-];
-
-// 0 or less (expired) — roast mode ON
-const QUOTES_EXPIRED = [
-  "Renew ASAP or else...", "Your ISP will be mad!", "Renew now to avoid ISP Warnings", "Renew subscription to continue", "Renew to avoid confrontation", "Renew now to continue", "We're not responsible, renew.", "We pause respectfully.", "Refill the fun meter.", "Next ep awaits payment.", "Fix the sub, then binge.", "Snack break until renew.", "Epic… after renewal.", "Re-subscribe to continue.", "Broke hours activated", "Screen black, dreams too", "Poor and plotless", "Renew or rot in reality", "Buffering… forever", "Cliffhanger hell awaits", "Wallet betrayed you", "Free trial? Cute story", "Back to real life, sucka", "Binge blocked. L bozo", "Paywall won. You lost.", "Subscription graveyard", "Bills > chills > skills", "Restart life.exe failed", "Touch grass (mandatory)", "You had one job: renew"
-];
-
-const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-
 // Simple in-memory cache
 const cache = new Map();
 const setCache = (key, value, ttlMs) =>
@@ -110,7 +69,7 @@ async function pRealDebrid({ token, fetchImpl = fetch }) {
     const res = await fetchImpl("https://api.real-debrid.com/rest/1.0/user", {
       headers: {
         Authorization: `Bearer ${token}`,
-        "User-Agent": "Statusio/1.0",
+        "User-Agent": "Statusio/1.2",
       },
     });
     if (!res.ok)
@@ -201,7 +160,7 @@ async function pAllDebrid({ key, fetchImpl = fetch }) {
     };
   try {
     const res = await fetchImpl("https://api.alldebrid.com/v4/user", {
-      headers: { Authorization: `Bearer ${key}`, "User-Agent": "Statusio/1.0" },
+      headers: { Authorization: `Bearer ${key}`, "User-Agent": "Statusio/1.2" },
     });
     if (!res.ok)
       return {
@@ -273,7 +232,7 @@ async function pPremiumize({ key, useOAuth = false, fetchImpl = fetch }) {
     const url = new URL("https://www.premiumize.me/api/account/info");
     url.searchParams.set(useOAuth ? "access_token" : "apikey", key);
     const res = await fetchImpl(url.toString(), {
-      headers: { "User-Agent": "Statusio/1.0" },
+      headers: { "User-Agent": "Statusio/1.2" },
     });
     if (!res.ok)
       return {
@@ -324,8 +283,6 @@ async function pPremiumize({ key, useOAuth = false, fetchImpl = fetch }) {
   }
 }
 
-// TorBox — updated to match documented API shape:
-//   { success, error, detail, data: { is_subscribed, premium_expires_at, ... } }
 async function pTorBox({ token, fetchImpl = fetch }) {
   const name = "TorBox";
   if (!token)
@@ -344,7 +301,7 @@ async function pTorBox({ token, fetchImpl = fetch }) {
       {
         headers: {
           Authorization: `Bearer ${token}`,
-          "User-Agent": "Statusio/1.0",
+          "User-Agent": "Statusio/1.2",
         },
       }
     );
@@ -362,7 +319,6 @@ async function pTorBox({ token, fetchImpl = fetch }) {
 
     const j = await res.json();
 
-    // TorBox standard response: { success, data, error, message/detail }
     if (j?.success === false && !j?.data) {
       return {
         name,
@@ -383,7 +339,6 @@ async function pTorBox({ token, fetchImpl = fetch }) {
     let days = null;
     let untilISO = null;
 
-    // Primary: ISO8601 expiry (e.g. "2025-04-02T19:13:05Z")
     const expiryIso =
       u?.premium_expires_at || u?.premiumExpiresAt || u?.premium_until_iso;
     if (expiryIso) {
@@ -398,7 +353,6 @@ async function pTorBox({ token, fetchImpl = fetch }) {
       u?.premium_left ||
       u?.premiumLeft
     ) {
-      // Fallback if TorBox ever exposes remaining seconds
       const out = daysLeftFromDurationSec(
         u.remainingPremiumSeconds || u.premium_left || u.premiumLeft
       );
@@ -419,7 +373,6 @@ async function pTorBox({ token, fetchImpl = fetch }) {
       };
     }
 
-    // Not subscribed / expired
     return {
       name,
       premium: false,
@@ -458,7 +411,7 @@ async function pDebridLink({
     };
   try {
     let url = endpoint;
-    const init = { headers: { "User-Agent": "Statusio/1.0" } };
+    const init = { headers: { "User-Agent": "Statusio/1.2" } };
     if (authScheme === "Bearer") {
       init.headers.Authorization = `Bearer ${key}`;
     } else {
@@ -520,16 +473,13 @@ async function pDebridLink({
 
 // --------------------------- Status Formatting -----------------------------
 function getStatusInfo(days) {
-  if (days <= 0)
-    return { emoji: "🔴", label: "Expired", quoteSet: QUOTES_EXPIRED };
-  if (days <= 3)
-    return { emoji: "🟠", label: "Critical", quoteSet: QUOTES_CRIT };
-  if (days <= 14)
-    return { emoji: "🟡", label: "Warning", quoteSet: QUOTES_WARN };
-  return { emoji: "🟢", label: "OK", quoteSet: QUOTES_OK };
+  if (days <= 0) return { emoji: "🔴", label: "Expired" };
+  if (days <= 3) return { emoji: "🟠", label: "Critical" };
+  if (days <= 14) return { emoji: "🟡", label: "Warning" };
+  return { emoji: "🟢", label: "OK" };
 }
 
-function formatProviderStatusWithBreaks(r) {
+function formatProviderStatus(r) {
   const user = r?.username ? `@${String(r.username)}` : "—";
   const days = Number.isFinite(r.daysLeft) && r.daysLeft !== null
     ? r.daysLeft
@@ -542,26 +492,25 @@ function formatProviderStatusWithBreaks(r) {
     ? "—"
     : "N/A";
   const numericDays = typeof days === "number" ? days : 9999;
-  const { emoji, label, quoteSet } = getStatusInfo(numericDays);
+  const { emoji, label } = getStatusInfo(numericDays);
 
-  // ONLY the per-field lines, joined by \n — no trailing footer
   const lines = [];
   lines.push(`🤝 Service: ${r.name}`);
   lines.push(`👤 User: ${user}`);
   lines.push(`⭐ Expires: ${dateStr}`);
   lines.push(`⏳️ Days left: ${days}`);
   lines.push(`${emoji} Status: ${label}`);
-  lines.push(`💬 ${pick(quoteSet)}`);
+  
   return lines.join("\n");
 }
 
-// --------------------------- Manifest (TV-Compatible) ----------------------
+// --------------------------- Manifest --------------------------------------
 const manifest = {
-  id: "a1337user.statusio.tv.compatible",
-  version: "1.1.26",
-  name: "Statusio",
+  id: "a1337user.statusio.critical.only",
+  version: "1.2.0",
+  name: "Statusio (Critical/Expired Only)",
   description:
-    "Shows premium status & days remaining across multiple debrid providers.",
+    "Shows premium status ONLY when ≤3 days remaining or expired.",
   resources: ["stream"],
   types: ["movie", "series"],
   idPrefixes: ["tt"],
@@ -670,12 +619,11 @@ async function fetchStatusData(cfg) {
   };
 }
 
-// ---------------------------- Stream Handler (TV) --------------------------
+// ---------------------------- Stream Handler -------------------------------
 builder.defineStreamHandler(async (args) => {
   const reqId = String(args?.id || "");
   if (!reqId || !reqId.startsWith("tt")) return { streams: [] };
 
-  // Parse config (object or JSON string)
   const rawCfg = args?.config ?? {};
   let cfg = {};
   if (typeof rawCfg === "string") {
@@ -690,16 +638,24 @@ builder.defineStreamHandler(async (args) => {
 
   const statusData = await fetchStatusData(cfg);
 
-  // TVs filter out setup/instructional streams; if no tokens, return empty.
   if (!Object.values(statusData.enabled).some((v) => v)) return { streams: [] };
 
   const streams = [];
   if (statusData.hasData) {
     for (const r of statusData.results) {
       if (r.premium !== null || r.username) {
+        const days = Number.isFinite(r.daysLeft) && r.daysLeft !== null
+          ? r.daysLeft
+          : r.premium
+          ? 9999
+          : 0;
+        
+        // ONLY show if critical (≤3 days) or expired (≤0)
+        if (days > 3) continue;
+
         streams.push({
           name: "🔐 Statusio",
-          description: formatProviderStatusWithBreaks(r), // ONLY lines, with \n
+          description: formatProviderStatus(r),
           url: "https://real-debrid.com/",
           externalUrl: "https://real-debrid.com/",
           behaviorHints: { notWebReady: true },
@@ -708,7 +664,6 @@ builder.defineStreamHandler(async (args) => {
     }
   }
 
-  // TV safety: cap number of streams returned (avoid UI overload)
   const MAX_TV_STREAMS = 3;
   const finalStreams = streams.slice(0, MAX_TV_STREAMS);
 
@@ -720,6 +675,6 @@ const PORT = Number(process.env.PORT || 7042);
 serveHTTP(builder.getInterface(), { port: PORT, hostname: "0.0.0.0" });
 
 console.log(
-  `✅ Statusio v1.1.26 at http://127.0.0.1:${PORT}/manifest.json`
+  `✅ Statusio v1.2.0 at http://127.0.0.1:${PORT}/manifest.json`
 );
-console.log(`↩️  Description now STRICTLY the six lines (no footer).`);
+console.log(`⚠️  Now showing ONLY when critical (≤3 days) or expired.`);
