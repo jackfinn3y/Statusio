@@ -872,6 +872,8 @@ builder.defineStreamHandler(async (args) => {
 
   console.log(`INFO | Stream request: ${reqId} | providers: ${enabledList}`);
 
+  const statusData = fetchStatusData(cfg);
+  
   // Fetch data (cache status will be logged inside fetch)
   const data = await statusData.fetch();
 
