@@ -713,7 +713,7 @@ const manifest = {
 const builder = new addonBuilder(manifest);
 
 // --------------------------- Shared Data Fetching --------------------------
-async function fetchStatusData(cfg) {
+function fetchStatusData(cfg) {
   const cacheMin = Number.isFinite(Number(cfg.cache_minutes))
     ? Math.max(1, Number(cfg.cache_minutes))
     : 45;
@@ -751,7 +751,6 @@ async function fetchStatusData(cfg) {
   const cached = getCache(cacheKey);
   
   return {
-    cached,
     enabled,
     async fetch() {
       if (cached) {
@@ -931,17 +930,11 @@ const PORT = Number(process.env.PORT || 7042);
 
 // Suppress SDK's HTTP message
 const originalLog = console.log;
-console.log = (...args) => {
-  const msg = args.join(' ');
-  if (!msg.includes('HTTP addon accessible at')) {
-    originalLog(...args);
-  }
-};
+console.log = () => {}; // Temporarily disable all console.log
 
 serveHTTP(builder.getInterface(), { port: PORT, hostname: "0.0.0.0" });
 
-// Restore console.log
-console.log = originalLog;
+console.log = originalLog; // Restore console.log
 
 console.log(`INFO | Statusio v1.2.0 started on port ${PORT}`);
 console.log("INFO | Showing only critical (≤3 days) or expired subscriptions");
