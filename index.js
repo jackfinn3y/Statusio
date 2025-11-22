@@ -872,7 +872,7 @@ builder.defineStreamHandler(async (args) => {
 
   console.log(`INFO | Stream request: ${reqId} | providers: ${enabledList}`);
 
-  // Fetch data and get cache status
+  // Fetch data (cache status will be logged inside fetch)
   const data = await statusData.fetch();
 
   if (data.hasData) {
