@@ -935,12 +935,26 @@ const PORT = Number(process.env.PORT || 7042);
 console.log(`INFO | Statusio v1.2.0 started on port ${PORT}`);
 console.log("INFO | Showing only critical (≤3 days) or expired subscriptions");
 
-// This completely suppresses the "HTTP addon accessible at: ..." message
+// Targeted suppression: Only block the exact Stremio SDK message
+const originalLog = console.log;
+console.log = (...args) => {
+  const msg = args.join(' ');
+  if (msg.includes('HTTP addon accessible at') || msg.includes('manifest.json')) {
+    return; // Silently skip *only* that message
+  }
+  return originalLog.apply(console, args); // Let everything else through
+};
+
+// Start the server (message will be caught by the override above)
 serveHTTP(builder.getInterface(), {
   port: PORT,
-  hostname: "0.0.0.0",
-  quiet: true          // ← This is all you need
+  hostname: "0.0.0.0"
 });
 
-// Warm cache after the server is running
+// Restore immediately (safe—SDK's log is the only async one here)
+setImmediate(() => {
+  console.log = originalLog;
+});
+
+// Warm cache after server starts
 warmCache();
