@@ -39,23 +39,42 @@ function daysLeftFromDurationSec(durationSec) {
   };
 }
 
-// Simple in-memory cache
+function formatDuration(ms) {
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${Math.round(ms / 60000)}min`;
+}
+
+// Simple in-memory cache with metadata
 const cache = new Map();
-const setCache = (key, value, ttlMs) =>
-  cache.set(key, { value, exp: Date.now() + ttlMs });
+const setCache = (key, value, ttlMs) => {
+  const now = Date.now();
+  cache.set(key, { value, exp: now + ttlMs, created: now, ttl: ttlMs });
+};
 const getCache = (key) => {
   const it = cache.get(key);
   if (!it) return null;
-  if (Date.now() > it.exp) {
+  const now = Date.now();
+  if (now > it.exp) {
     cache.delete(key);
     return null;
   }
-  return it.value;
+  const age = now - it.created;
+  const remaining = it.exp - now;
+  return { 
+    value: it.value, 
+    age, 
+    remaining,
+    ageStr: formatDuration(age),
+    remainingStr: formatDuration(remaining)
+  };
 };
 
 // --------------------------- Providers -------------------------------------
 async function pRealDebrid({ token, fetchImpl = fetch }) {
   const name = "Real-Debrid";
+  const startTime = Date.now();
+  
   if (!token)
     return {
       name,
@@ -64,6 +83,7 @@ async function pRealDebrid({ token, fetchImpl = fetch }) {
       untilISO: null,
       username: null,
       note: "missing token",
+      error: true,
     };
   try {
     const res = await fetchImpl("https://api.real-debrid.com/rest/1.0/user", {
@@ -72,8 +92,10 @@ async function pRealDebrid({ token, fetchImpl = fetch }) {
         "User-Agent": "Statusio/1.2",
       },
     });
+    const elapsed = Date.now() - startTime;
+    
     if (!res.ok) {
-      console.log(`✗ Real-Debrid: HTTP ${res.status}`);
+      console.log(`ERROR | Real-Debrid: HTTP ${res.status} [${elapsed}ms]`);
       return {
         name,
         premium: null,
@@ -81,6 +103,7 @@ async function pRealDebrid({ token, fetchImpl = fetch }) {
         untilISO: null,
         username: null,
         note: `HTTP ${res.status}`,
+        error: true,
       };
     }
     const j = await res.json();
@@ -115,26 +138,28 @@ async function pRealDebrid({ token, fetchImpl = fetch }) {
 
     if (premium === true) {
       const status = days <= 0 ? "Expired" : days <= 3 ? "Critical" : days <= 14 ? "Warning" : "OK";
-      console.log(`✓ Real-Debrid: @${username || "unknown"}, ${days ?? "—"} days left (${status})`);
+      console.log(`INFO | Real-Debrid: @${username || "unknown"}, ${days ?? "—"} days left (${status}) [${elapsed}ms]`);
       return {
         name,
         premium: true,
         daysLeft: days ?? null,
         untilISO: untilISO ?? null,
         username,
+        error: false,
       };
     }
     if (premium === false) {
-      console.log(`✓ Real-Debrid: @${username || "unknown"}, not premium`);
+      console.log(`INFO | Real-Debrid: @${username || "unknown"}, not premium [${elapsed}ms]`);
       return {
         name,
         premium: false,
         daysLeft: 0,
         untilISO: null,
         username,
+        error: false,
       };
     }
-    console.log(`✗ Real-Debrid: status unknown`);
+    console.log(`ERROR | Real-Debrid: status unknown [${elapsed}ms]`);
     return {
       name,
       premium: null,
@@ -142,9 +167,11 @@ async function pRealDebrid({ token, fetchImpl = fetch }) {
       untilISO: null,
       username,
       note: "status unknown",
+      error: true,
     };
   } catch (e) {
-    console.log(`✗ Real-Debrid: network ${e.message}`);
+    const elapsed = Date.now() - startTime;
+    console.log(`ERROR | Real-Debrid: network ${e.message} [${elapsed}ms]`);
     return {
       name,
       premium: null,
@@ -152,12 +179,15 @@ async function pRealDebrid({ token, fetchImpl = fetch }) {
       untilISO: null,
       username: null,
       note: `network ${e.message}`,
+      error: true,
     };
   }
 }
 
 async function pAllDebrid({ key, fetchImpl = fetch }) {
   const name = "AllDebrid";
+  const startTime = Date.now();
+  
   if (!key)
     return {
       name,
@@ -166,13 +196,16 @@ async function pAllDebrid({ key, fetchImpl = fetch }) {
       untilISO: null,
       username: null,
       note: "missing key",
+      error: true,
     };
   try {
     const res = await fetchImpl("https://api.alldebrid.com/v4/user", {
       headers: { Authorization: `Bearer ${key}`, "User-Agent": "Statusio/1.2" },
     });
+    const elapsed = Date.now() - startTime;
+    
     if (!res.ok) {
-      console.log(`✗ AllDebrid: HTTP ${res.status}`);
+      console.log(`ERROR | AllDebrid: HTTP ${res.status} [${elapsed}ms]`);
       return {
         name,
         premium: null,
@@ -180,11 +213,12 @@ async function pAllDebrid({ key, fetchImpl = fetch }) {
         untilISO: null,
         username: null,
         note: `HTTP ${res.status}`,
+        error: true,
       };
     }
     const j = await res.json();
     if (j?.status !== "success" || !j?.data?.user) {
-      console.log(`✗ AllDebrid: bad response`);
+      console.log(`ERROR | AllDebrid: bad response [${elapsed}ms]`);
       return {
         name,
         premium: null,
@@ -192,6 +226,7 @@ async function pAllDebrid({ key, fetchImpl = fetch }) {
         untilISO: null,
         username: null,
         note: "bad response",
+        error: true,
       };
     }
     const u = j.data.user;
@@ -206,26 +241,29 @@ async function pAllDebrid({ key, fetchImpl = fetch }) {
     
     if (isPrem) {
       const status = out.days <= 0 ? "Expired" : out.days <= 3 ? "Critical" : out.days <= 14 ? "Warning" : "OK";
-      console.log(`✓ AllDebrid: @${username || "unknown"}, ${out.days ?? "—"} days left (${status})`);
+      console.log(`INFO | AllDebrid: @${username || "unknown"}, ${out.days ?? "—"} days left (${status}) [${elapsed}ms]`);
       return {
         name,
         premium: true,
         daysLeft: out.days,
         untilISO: out.untilISO,
         username,
+        error: false,
       };
     } else {
-      console.log(`✓ AllDebrid: @${username || "unknown"}, not premium`);
+      console.log(`INFO | AllDebrid: @${username || "unknown"}, not premium [${elapsed}ms]`);
       return {
         name,
         premium: false,
         daysLeft: 0,
         untilISO: null,
         username,
+        error: false,
       };
     }
   } catch (e) {
-    console.log(`✗ AllDebrid: network ${e.message}`);
+    const elapsed = Date.now() - startTime;
+    console.log(`ERROR | AllDebrid: network ${e.message} [${elapsed}ms]`);
     return {
       name,
       premium: null,
@@ -233,12 +271,15 @@ async function pAllDebrid({ key, fetchImpl = fetch }) {
       untilISO: null,
       username: null,
       note: `network ${e.message}`,
+      error: true,
     };
   }
 }
 
 async function pPremiumize({ key, useOAuth = false, fetchImpl = fetch }) {
   const name = "Premiumize";
+  const startTime = Date.now();
+  
   if (!key)
     return {
       name,
@@ -247,6 +288,7 @@ async function pPremiumize({ key, useOAuth = false, fetchImpl = fetch }) {
       untilISO: null,
       username: null,
       note: "missing key",
+      error: true,
     };
   try {
     const url = new URL("https://www.premiumize.me/api/account/info");
@@ -254,8 +296,10 @@ async function pPremiumize({ key, useOAuth = false, fetchImpl = fetch }) {
     const res = await fetchImpl(url.toString(), {
       headers: { "User-Agent": "Statusio/1.2" },
     });
+    const elapsed = Date.now() - startTime;
+    
     if (!res.ok) {
-      console.log(`✗ Premiumize: HTTP ${res.status}`);
+      console.log(`ERROR | Premiumize: HTTP ${res.status} [${elapsed}ms]`);
       return {
         name,
         premium: null,
@@ -263,11 +307,12 @@ async function pPremiumize({ key, useOAuth = false, fetchImpl = fetch }) {
         untilISO: null,
         username: null,
         note: `HTTP ${res.status}`,
+        error: true,
       };
     }
     const j = await res.json();
     if (String(j.status).toLowerCase() !== "success") {
-      console.log(`✗ Premiumize: bad response`);
+      console.log(`ERROR | Premiumize: bad response [${elapsed}ms]`);
       return {
         name,
         premium: null,
@@ -275,6 +320,7 @@ async function pPremiumize({ key, useOAuth = false, fetchImpl = fetch }) {
         untilISO: null,
         username: null,
         note: "bad response",
+        error: true,
       };
     }
     const out = daysLeftFromEpochSec(j.premium_until || 0);
@@ -283,26 +329,29 @@ async function pPremiumize({ key, useOAuth = false, fetchImpl = fetch }) {
     
     if (isPrem) {
       const status = out.days <= 0 ? "Expired" : out.days <= 3 ? "Critical" : out.days <= 14 ? "Warning" : "OK";
-      console.log(`✓ Premiumize: @${username || "unknown"}, ${out.days} days left (${status})`);
+      console.log(`INFO | Premiumize: @${username || "unknown"}, ${out.days} days left (${status}) [${elapsed}ms]`);
       return {
         name,
         premium: true,
         daysLeft: out.days,
         untilISO: out.untilISO,
         username,
+        error: false,
       };
     } else {
-      console.log(`✓ Premiumize: @${username || "unknown"}, not premium`);
+      console.log(`INFO | Premiumize: @${username || "unknown"}, not premium [${elapsed}ms]`);
       return {
         name,
         premium: false,
         daysLeft: 0,
         untilISO: null,
         username,
+        error: false,
       };
     }
   } catch (e) {
-    console.log(`✗ Premiumize: network ${e.message}`);
+    const elapsed = Date.now() - startTime;
+    console.log(`ERROR | Premiumize: network ${e.message} [${elapsed}ms]`);
     return {
       name,
       premium: null,
@@ -310,12 +359,15 @@ async function pPremiumize({ key, useOAuth = false, fetchImpl = fetch }) {
       untilISO: null,
       username: null,
       note: `network ${e.message}`,
+      error: true,
     };
   }
 }
 
 async function pTorBox({ token, fetchImpl = fetch }) {
   const name = "TorBox";
+  const startTime = Date.now();
+  
   if (!token)
     return {
       name,
@@ -324,6 +376,7 @@ async function pTorBox({ token, fetchImpl = fetch }) {
       untilISO: null,
       username: null,
       note: "missing token",
+      error: true,
     };
 
   try {
@@ -337,8 +390,10 @@ async function pTorBox({ token, fetchImpl = fetch }) {
       }
     );
 
+    const elapsed = Date.now() - startTime;
+
     if (!res.ok) {
-      console.log(`✗ TorBox: HTTP ${res.status}`);
+      console.log(`ERROR | TorBox: HTTP ${res.status} [${elapsed}ms]`);
       return {
         name,
         premium: null,
@@ -346,13 +401,14 @@ async function pTorBox({ token, fetchImpl = fetch }) {
         untilISO: null,
         username: null,
         note: `HTTP ${res.status}`,
+        error: true,
       };
     }
 
     const j = await res.json();
 
     if (j?.success === false && !j?.data) {
-      console.log(`✗ TorBox: ${j.error || j.message || "unsuccessful response"}`);
+      console.log(`ERROR | TorBox: ${j.error || j.message || "unsuccessful response"} [${elapsed}ms]`);
       return {
         name,
         premium: null,
@@ -360,6 +416,7 @@ async function pTorBox({ token, fetchImpl = fetch }) {
         untilISO: null,
         username: null,
         note: j.error || j.message || "TorBox: unsuccessful response",
+        error: true,
       };
     }
 
@@ -398,17 +455,18 @@ async function pTorBox({ token, fetchImpl = fetch }) {
 
     if (isPrem) {
       const status = days <= 0 ? "Expired" : days <= 3 ? "Critical" : days <= 14 ? "Warning" : "OK";
-      console.log(`✓ TorBox: @${username || "unknown"}, ${hasDays ? days : "—"} days left (${status})`);
+      console.log(`INFO | TorBox: @${username || "unknown"}, ${hasDays ? days : "—"} days left (${status}) [${elapsed}ms]`);
       return {
         name,
         premium: true,
         daysLeft: hasDays ? days : null,
         untilISO,
         username,
+        error: false,
       };
     }
 
-    console.log(`✓ TorBox: @${username || "unknown"}, not subscribed`);
+    console.log(`INFO | TorBox: @${username || "unknown"}, not subscribed [${elapsed}ms]`);
     return {
       name,
       premium: false,
@@ -416,9 +474,11 @@ async function pTorBox({ token, fetchImpl = fetch }) {
       untilISO: null,
       username,
       note: j.error || j.message || u?.note || "not subscribed",
+      error: false,
     };
   } catch (e) {
-    console.log(`✗ TorBox: network ${e.message}`);
+    const elapsed = Date.now() - startTime;
+    console.log(`ERROR | TorBox: network ${e.message} [${elapsed}ms]`);
     return {
       name,
       premium: null,
@@ -426,6 +486,7 @@ async function pTorBox({ token, fetchImpl = fetch }) {
       untilISO: null,
       username: null,
       note: `network ${e.message}`,
+      error: true,
     };
   }
 }
@@ -437,6 +498,8 @@ async function pDebridLink({
   fetchImpl = fetch,
 }) {
   const name = "Debrid-Link";
+  const startTime = Date.now();
+  
   if (!key)
     return {
       name,
@@ -445,6 +508,7 @@ async function pDebridLink({
       untilISO: null,
       username: null,
       note: "missing key",
+      error: true,
     };
   try {
     let url = endpoint;
@@ -457,8 +521,10 @@ async function pDebridLink({
       url = u.toString();
     }
     const res = await fetchImpl(url, init);
+    const elapsed = Date.now() - startTime;
+    
     if (!res.ok) {
-      console.log(`✗ Debrid-Link: HTTP ${res.status}`);
+      console.log(`ERROR | Debrid-Link: HTTP ${res.status} [${elapsed}ms]`);
       return {
         name,
         premium: null,
@@ -466,11 +532,12 @@ async function pDebridLink({
         untilISO: null,
         username: null,
         note: `HTTP ${res.status}`,
+        error: true,
       };
     }
     const j = await res.json();
     if (!j?.success || !j?.value) {
-      console.log(`✗ Debrid-Link: bad response`);
+      console.log(`ERROR | Debrid-Link: bad response [${elapsed}ms]`);
       return {
         name,
         premium: null,
@@ -478,6 +545,7 @@ async function pDebridLink({
         untilISO: null,
         username: null,
         note: "bad response",
+        error: true,
       };
     }
     const secs = Number(j.value.premiumLeft || 0);
@@ -487,17 +555,18 @@ async function pDebridLink({
     
     if (out.days > 0) {
       const status = out.days <= 0 ? "Expired" : out.days <= 3 ? "Critical" : out.days <= 14 ? "Warning" : "OK";
-      console.log(`✓ Debrid-Link: @${username || "unknown"}, ${out.days} days left (${status})`);
+      console.log(`INFO | Debrid-Link: @${username || "unknown"}, ${out.days} days left (${status}) [${elapsed}ms]`);
       return {
         name,
         premium: true,
         daysLeft: out.days,
         untilISO: out.untilISO,
         username,
+        error: false,
       };
     }
     
-    console.log(`✓ Debrid-Link: @${username || "unknown"}, not premium (accountType=${j.value.accountType ?? "?"})`);
+    console.log(`INFO | Debrid-Link: @${username || "unknown"}, not premium (accountType=${j.value.accountType ?? "?"}) [${elapsed}ms]`);
     return {
       name,
       premium: false,
@@ -505,9 +574,11 @@ async function pDebridLink({
       untilISO: null,
       username,
       note: `accountType=${j.value.accountType ?? "?"}`,
+      error: false,
     };
   } catch (e) {
-    console.log(`✗ Debrid-Link: network ${e.message}`);
+    const elapsed = Date.now() - startTime;
+    console.log(`ERROR | Debrid-Link: network ${e.message} [${elapsed}ms]`);
     return {
       name,
       premium: null,
@@ -515,6 +586,7 @@ async function pDebridLink({
       untilISO: null,
       username: null,
       note: `network ${e.message}`,
+      error: true,
     };
   }
 }
@@ -552,6 +624,41 @@ function formatProviderStatus(r) {
   return lines.join("\n");
 }
 
+function formatErrorStream(r) {
+  const lines = [];
+  lines.push(`⚠️ Unable to check ${r.name} status`);
+  lines.push(``);
+  lines.push(`Error: ${r.note || "Unknown error"}`);
+  lines.push(``);
+  lines.push(`Troubleshooting:`);
+  
+  if (r.note?.includes("HTTP 401") || r.note?.includes("HTTP 403")) {
+    lines.push(`• Check if your API token is valid`);
+    lines.push(`• Token may have expired or been revoked`);
+    lines.push(`• Verify token in your ${r.name} account`);
+  } else if (r.note?.includes("HTTP 429")) {
+    lines.push(`• Rate limit exceeded`);
+    lines.push(`• Wait a few minutes before retrying`);
+  } else if (r.note?.includes("HTTP 5")) {
+    lines.push(`• ${r.name} service may be down`);
+    lines.push(`• Check ${r.name} status page`);
+    lines.push(`• Try again in a few minutes`);
+  } else if (r.note?.includes("network")) {
+    lines.push(`• Check your internet connection`);
+    lines.push(`• ${r.name} API may be unreachable`);
+    lines.push(`• Try again later`);
+  } else if (r.note === "missing token" || r.note === "missing key") {
+    lines.push(`• API token not configured`);
+    lines.push(`• Add your ${r.name} token in settings`);
+  } else {
+    lines.push(`• Check your ${r.name} account status`);
+    lines.push(`• Verify API credentials are correct`);
+    lines.push(`• Check addon logs for details`);
+  }
+  
+  return lines.join("\n");
+}
+
 // --------------------------- Manifest --------------------------------------
 const manifest = {
   id: "a1337user.statusio.critical.only",
@@ -571,6 +678,13 @@ const manifest = {
       type: "number",
       default: "45",
       title: "Cache Minutes (default 45)",
+    },
+    {
+      key: "show_errors",
+      type: "select",
+      options: ["true", "false"],
+      default: "true",
+      title: "Show error streams for failed checks",
     },
     { key: "rd_token", type: "text", title: "Real-Debrid Token (Bearer)" },
     { key: "ad_key", type: "text", title: "AllDebrid API Key (Bearer)" },
@@ -634,40 +748,85 @@ async function fetchStatusData(cfg) {
     }`,
   ].join("|");
 
-  let results = getCache(cacheKey);
-  if (!results) {
-    console.log(`Cache MISS - fetching fresh data`);
-    try {
-      const jobs = [];
-      if (enabled.realdebrid) jobs.push(pRealDebrid({ token: tokens.rd }));
-      if (enabled.alldebrid) jobs.push(pAllDebrid({ key: tokens.ad }));
-      if (enabled.premiumize) jobs.push(pPremiumize({ key: tokens.pm }));
-      if (enabled.torbox) jobs.push(pTorBox({ token: tokens.tb }));
-      if (enabled.debridlink)
-        jobs.push(
-          pDebridLink({
-            key: tokens.dl,
-            authScheme: cfg.dl_auth || "Bearer",
-            endpoint: (cfg.dl_endpoint ||
-              "https://debrid-link.com/api/account/infos"
-            ).trim(),
-          })
-        );
-      results = jobs.length ? await Promise.all(jobs) : [];
-      setCache(cacheKey, results, cacheMin * MIN);
-    } catch (e) {
-      console.error("Error fetching provider data:", e);
-      return { error: e.message, results: [], enabled, hasData: false };
-    }
-  } else {
-    console.log(`Cache HIT`);
+  const cached = getCache(cacheKey);
+  if (cached) {
+    console.log(`INFO | Cache HIT (age: ${cached.ageStr}, expires in: ${cached.remainingStr})`);
+    return {
+      results: cached.value,
+      enabled,
+      hasData: cached.value.some((r) => r.premium !== null || r.username),
+    };
   }
 
-  return {
-    results,
-    enabled,
-    hasData: results.some((r) => r.premium !== null || r.username),
+  console.log(`INFO | Cache MISS - fetching fresh data (TTL: ${cacheMin}min)`);
+  try {
+    const jobs = [];
+    if (enabled.realdebrid) jobs.push(pRealDebrid({ token: tokens.rd }));
+    if (enabled.alldebrid) jobs.push(pAllDebrid({ key: tokens.ad }));
+    if (enabled.premiumize) jobs.push(pPremiumize({ key: tokens.pm }));
+    if (enabled.torbox) jobs.push(pTorBox({ token: tokens.tb }));
+    if (enabled.debridlink)
+      jobs.push(
+        pDebridLink({
+          key: tokens.dl,
+          authScheme: cfg.dl_auth || "Bearer",
+          endpoint: (cfg.dl_endpoint ||
+            "https://debrid-link.com/api/account/infos"
+          ).trim(),
+        })
+      );
+    const results = jobs.length ? await Promise.all(jobs) : [];
+    setCache(cacheKey, results, cacheMin * MIN);
+    
+    return {
+      results,
+      enabled,
+      hasData: results.some((r) => r.premium !== null || r.username),
+    };
+  } catch (e) {
+    console.error("ERROR | Error fetching provider data:", e);
+    return { error: e.message, results: [], enabled, hasData: false };
+  }
+}
+
+// --------------------------- Cache Warming ---------------------------------
+async function warmCache() {
+  const tokens = {
+    rd: String(process.env.RD_TOKEN || "").trim(),
+    ad: String(process.env.AD_KEY || "").trim(),
+    pm: String(process.env.PM_KEY || "").trim(),
+    tb: String(process.env.TB_TOKEN || "").trim(),
+    dl: String(process.env.DL_KEY || "").trim(),
   };
+
+  const enabledServices = [];
+  if (tokens.rd) enabledServices.push("Real-Debrid");
+  if (tokens.ad) enabledServices.push("AllDebrid");
+  if (tokens.pm) enabledServices.push("Premiumize");
+  if (tokens.tb) enabledServices.push("TorBox");
+  if (tokens.dl) enabledServices.push("Debrid-Link");
+
+  if (enabledServices.length === 0) {
+    console.log("INFO | No services configured via environment variables");
+    return;
+  }
+
+  console.log(`INFO | Enabled services: ${enabledServices.join(", ")}`);
+  console.log("INFO | Warming cache on startup...");
+
+  try {
+    await fetchStatusData({
+      cache_minutes: 45,
+      rd_token: tokens.rd,
+      ad_key: tokens.ad,
+      pm_key: tokens.pm,
+      tb_token: tokens.tb,
+      dl_key: tokens.dl,
+    });
+    console.log(`INFO | Cache warming complete (${enabledServices.length} provider${enabledServices.length > 1 ? 's' : ''} checked)`);
+  } catch (e) {
+    console.error("ERROR | Cache warming failed:", e.message);
+  }
 }
 
 // ---------------------------- Stream Handler -------------------------------
@@ -675,7 +834,7 @@ builder.defineStreamHandler(async (args) => {
   const reqId = String(args?.id || "");
   if (!reqId || !reqId.startsWith("tt")) return { streams: [] };
 
-  console.log(`Stream request: ${reqId}`);
+  console.log(`INFO | Stream request: ${reqId}`);
 
   const rawCfg = args?.config ?? {};
   let cfg = {};
@@ -683,7 +842,7 @@ builder.defineStreamHandler(async (args) => {
     try {
       cfg = JSON.parse(rawCfg);
     } catch {
-      console.log(`Config parse error`);
+      console.log("WARN | Config parse error");
       cfg = {};
     }
   } else if (typeof rawCfg === "object" && rawCfg !== null) {
@@ -693,7 +852,7 @@ builder.defineStreamHandler(async (args) => {
   const statusData = await fetchStatusData(cfg);
 
   if (!Object.values(statusData.enabled).some((v) => v)) {
-    console.log(`No providers configured`);
+    console.log("WARN | No providers configured");
     return { streams: [] };
   }
 
@@ -701,11 +860,29 @@ builder.defineStreamHandler(async (args) => {
     .filter(([, v]) => v)
     .map(([k]) => k)
     .join(", ");
-  console.log(`Enabled providers: ${enabledList}`);
+  console.log(`INFO | Enabled providers: ${enabledList}`);
 
+  const showErrors = cfg.show_errors !== "false"; // default true
   const streams = [];
+  const errorStreams = [];
+
   if (statusData.hasData) {
     for (const r of statusData.results) {
+      // Handle errors
+      if (r.error) {
+        if (showErrors) {
+          console.log(`INFO | Adding error stream: ${r.name} check failed (${r.note})`);
+          errorStreams.push({
+            name: `⚠️ ${r.name} Error`,
+            description: formatErrorStream(r),
+            url: "https://real-debrid.com/",
+            externalUrl: "https://real-debrid.com/",
+            behaviorHints: { notWebReady: true },
+          });
+        }
+        continue;
+      }
+
       if (r.premium !== null || r.username) {
         const days = Number.isFinite(r.daysLeft) && r.daysLeft !== null
           ? r.daysLeft
@@ -715,11 +892,11 @@ builder.defineStreamHandler(async (args) => {
         
         // ONLY show if critical (≤3 days) or expired (≤0)
         if (days > 3) {
-          console.log(`${r.name}: ${days} days left - filtered out (not critical)`);
+          console.log(`INFO | ${r.name}: ${days} days left - filtered out (not critical)`);
           continue;
         }
 
-        console.log(`${r.name}: ${days} days left - including stream (critical/expired)`);
+        console.log(`INFO | ${r.name}: ${days} days left - including stream (critical/expired)`);
         streams.push({
           name: "🔐 Statusio",
           description: formatProviderStatus(r),
@@ -731,10 +908,19 @@ builder.defineStreamHandler(async (args) => {
     }
   }
 
+  const allStreams = [...streams, ...errorStreams];
   const MAX_TV_STREAMS = 3;
-  const finalStreams = streams.slice(0, MAX_TV_STREAMS);
+  const finalStreams = allStreams.slice(0, MAX_TV_STREAMS);
 
-  console.log(`Returning ${finalStreams.length} critical/expired stream(s)`);
+  if (streams.length > 0) {
+    console.log(`INFO | Returning ${streams.length} critical/expired stream(s)`);
+  }
+  if (errorStreams.length > 0) {
+    console.log(`INFO | Returning ${errorStreams.length} error stream(s) for failed providers`);
+  }
+  if (finalStreams.length === 0) {
+    console.log("INFO | Returning 0 streams");
+  }
 
   return { streams: finalStreams };
 });
@@ -743,5 +929,8 @@ builder.defineStreamHandler(async (args) => {
 const PORT = Number(process.env.PORT || 7042);
 serveHTTP(builder.getInterface(), { port: PORT, hostname: "0.0.0.0" });
 
-console.log(`🚀 Statusio v1.2.0 started on port ${PORT}`);
-console.log(`📋 Showing only critical (≤3 days) or expired subscriptions`);
+console.log(`INFO | Statusio v1.2.0 started on port ${PORT}`);
+console.log("INFO | Showing only critical (≤3 days) or expired subscriptions");
+
+// Warm cache after server starts
+warmCache();
