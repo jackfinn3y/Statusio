@@ -856,12 +856,12 @@ builder.defineStreamHandler(async (args) => {
 
   const statusData = await fetchStatusData(cfg);
 
-  if (!Object.values(statusData.enabled).some((v) => v)) {
+  if (!Object.values(dataFetcher.enabled).some((v) => v)) {
     console.log("WARN | No providers configured");
     return { streams: [] };
   }
 
-  const enabledList = Object.entries(statusData.enabled)
+  const enabledList = Object.entries(dataFetcher.enabled)
     .filter(([, v]) => v)
     .map(([k]) => k)
     .join(", ");
@@ -872,10 +872,10 @@ builder.defineStreamHandler(async (args) => {
 
   console.log(`INFO | Stream request: ${reqId} | providers: ${enabledList}`);
 
-  const statusData = fetchStatusData(cfg);
+  const dataFetcher = fetchStatusData(cfg);
   
   // Fetch data (cache status will be logged inside fetch)
-  const data = await statusData.fetch();
+  const data = await dataFetcher.fetch();
 
   if (data.hasData) {
     for (const r of data.results) {
