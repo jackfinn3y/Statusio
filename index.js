@@ -749,44 +749,51 @@ async function fetchStatusData(cfg) {
   ].join("|");
 
   const cached = getCache(cacheKey);
-  if (cached) {
-    console.log(`INFO | Cache HIT (age: ${cached.ageStr}, expires in: ${cached.remainingStr})`);
-    return {
-      results: cached.value,
-      enabled,
-      hasData: cached.value.some((r) => r.premium !== null || r.username),
-    };
-  }
+  
+  return {
+    cached,
+    enabled,
+    async fetch() {
+      if (cached) {
+        return {
+          results: cached.value,
+          cacheStatus: `HIT (age: ${cached.ageStr}, expires in: ${cached.remainingStr})`,
+          enabled,
+          hasData: cached.value.some((r) => r.premium !== null || r.username),
+        };
+      }
 
-  console.log(`INFO | Cache MISS - fetching fresh data (TTL: ${cacheMin}min)`);
-  try {
-    const jobs = [];
-    if (enabled.realdebrid) jobs.push(pRealDebrid({ token: tokens.rd }));
-    if (enabled.alldebrid) jobs.push(pAllDebrid({ key: tokens.ad }));
-    if (enabled.premiumize) jobs.push(pPremiumize({ key: tokens.pm }));
-    if (enabled.torbox) jobs.push(pTorBox({ token: tokens.tb }));
-    if (enabled.debridlink)
-      jobs.push(
-        pDebridLink({
-          key: tokens.dl,
-          authScheme: cfg.dl_auth || "Bearer",
-          endpoint: (cfg.dl_endpoint ||
-            "https://debrid-link.com/api/account/infos"
-          ).trim(),
-        })
-      );
-    const results = jobs.length ? await Promise.all(jobs) : [];
-    setCache(cacheKey, results, cacheMin * MIN);
-    
-    return {
-      results,
-      enabled,
-      hasData: results.some((r) => r.premium !== null || r.username),
-    };
-  } catch (e) {
-    console.error("ERROR | Error fetching provider data:", e);
-    return { error: e.message, results: [], enabled, hasData: false };
-  }
+      try {
+        const jobs = [];
+        if (enabled.realdebrid) jobs.push(pRealDebrid({ token: tokens.rd }));
+        if (enabled.alldebrid) jobs.push(pAllDebrid({ key: tokens.ad }));
+        if (enabled.premiumize) jobs.push(pPremiumize({ key: tokens.pm }));
+        if (enabled.torbox) jobs.push(pTorBox({ token: tokens.tb }));
+        if (enabled.debridlink)
+          jobs.push(
+            pDebridLink({
+              key: tokens.dl,
+              authScheme: cfg.dl_auth || "Bearer",
+              endpoint: (cfg.dl_endpoint ||
+                "https://debrid-link.com/api/account/infos"
+              ).trim(),
+            })
+          );
+        const results = jobs.length ? await Promise.all(jobs) : [];
+        setCache(cacheKey, results, cacheMin * MIN);
+        
+        return {
+          results,
+          cacheStatus: `MISS (TTL: ${cacheMin}min)`,
+          enabled,
+          hasData: results.some((r) => r.premium !== null || r.username),
+        };
+      } catch (e) {
+        console.error("ERROR | Error fetching provider data:", e);
+        return { error: e.message, results: [], cacheStatus: "ERROR", enabled, hasData: false };
+      }
+    }
+  };
 }
 
 // --------------------------- Cache Warming ---------------------------------
@@ -815,7 +822,7 @@ async function warmCache() {
   console.log("INFO | Warming cache on startup...");
 
   try {
-    await fetchStatusData({
+    const statusData = await fetchStatusData({
       cache_minutes: 45,
       rd_token: tokens.rd,
       ad_key: tokens.ad,
@@ -823,6 +830,7 @@ async function warmCache() {
       tb_token: tokens.tb,
       dl_key: tokens.dl,
     });
+    await statusData.fetch();
     console.log(`INFO | Cache warming complete (${enabledServices.length} provider${enabledServices.length > 1 ? 's' : ''} checked)`);
   } catch (e) {
     console.error("ERROR | Cache warming failed:", e.message);
@@ -833,8 +841,6 @@ async function warmCache() {
 builder.defineStreamHandler(async (args) => {
   const reqId = String(args?.id || "");
   if (!reqId || !reqId.startsWith("tt")) return { streams: [] };
-
-  console.log(`INFO | Stream request: ${reqId}`);
 
   const rawCfg = args?.config ?? {};
   let cfg = {};
@@ -860,14 +866,19 @@ builder.defineStreamHandler(async (args) => {
     .filter(([, v]) => v)
     .map(([k]) => k)
     .join(", ");
-  console.log(`INFO | Enabled providers: ${enabledList}`);
 
   const showErrors = cfg.show_errors !== "false"; // default true
   const streams = [];
   const errorStreams = [];
 
-  if (statusData.hasData) {
-    for (const r of statusData.results) {
+  // Fetch data and get cache status
+  const data = await statusData.fetch();
+  const cacheStatus = data.cacheStatus.includes("HIT") ? `cache ${data.cacheStatus.split(" ")[0]}` : `cache ${data.cacheStatus.split(" ")[0]}`;
+  
+  console.log(`INFO | Stream request: ${reqId} | ${cacheStatus} | providers: ${enabledList}`);
+
+  if (data.hasData) {
+    for (const r of data.results) {
       // Handle errors
       if (r.error) {
         if (showErrors) {
@@ -892,8 +903,7 @@ builder.defineStreamHandler(async (args) => {
         
         // ONLY show if critical (≤3 days) or expired (≤0)
         if (days > 3) {
-          console.log(`INFO | ${r.name}: ${days} days left - filtered out (not critical)`);
-          continue;
+          continue; // Silently filter out non-critical
         }
 
         console.log(`INFO | ${r.name}: ${days} days left - including stream (critical/expired)`);
@@ -912,15 +922,7 @@ builder.defineStreamHandler(async (args) => {
   const MAX_TV_STREAMS = 3;
   const finalStreams = allStreams.slice(0, MAX_TV_STREAMS);
 
-  if (streams.length > 0) {
-    console.log(`INFO | Returning ${streams.length} critical/expired stream(s)`);
-  }
-  if (errorStreams.length > 0) {
-    console.log(`INFO | Returning ${errorStreams.length} error stream(s) for failed providers`);
-  }
-  if (finalStreams.length === 0) {
-    console.log("INFO | Returning 0 streams");
-  }
+  console.log(`INFO | Returning ${finalStreams.length} streams`);
 
   return { streams: finalStreams };
 });
