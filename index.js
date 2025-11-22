@@ -821,7 +821,7 @@ async function warmCache() {
   console.log("INFO | Warming cache on startup...");
 
   try {
-    const statusData = await fetchStatusData({
+    const dataFetcher = fetchStatusData({
       cache_minutes: 45,
       rd_token: tokens.rd,
       ad_key: tokens.ad,
@@ -829,7 +829,7 @@ async function warmCache() {
       tb_token: tokens.tb,
       dl_key: tokens.dl,
     });
-    await statusData.fetch();
+    await dataFetcher.fetch();
     console.log(`INFO | Cache warming complete (${enabledServices.length} provider${enabledServices.length > 1 ? 's' : ''} checked)`);
   } catch (e) {
     console.error("ERROR | Cache warming failed:", e.message);
@@ -928,7 +928,20 @@ builder.defineStreamHandler(async (args) => {
 
 // ------------------------------ Server -------------------------------------
 const PORT = Number(process.env.PORT || 7042);
+
+// Suppress SDK's HTTP message
+const originalLog = console.log;
+console.log = (...args) => {
+  const msg = args.join(' ');
+  if (!msg.includes('HTTP addon accessible at')) {
+    originalLog(...args);
+  }
+};
+
 serveHTTP(builder.getInterface(), { port: PORT, hostname: "0.0.0.0" });
+
+// Restore console.log
+console.log = originalLog;
 
 console.log(`INFO | Statusio v1.2.0 started on port ${PORT}`);
 console.log("INFO | Showing only critical (≤3 days) or expired subscriptions");
