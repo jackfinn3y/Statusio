@@ -906,7 +906,6 @@ builder.defineStreamHandler(async (args) => {
           continue; // Silently filter out non-critical
         }
 
-        console.log(`INFO | ${r.name}: ${days} days left - including stream (critical/expired)`);
         streams.push({
           name: "🔐 Statusio",
           description: formatProviderStatus(r),
