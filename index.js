@@ -871,11 +871,10 @@ builder.defineStreamHandler(async (args) => {
   const streams = [];
   const errorStreams = [];
 
+  console.log(`INFO | Stream request: ${reqId} | providers: ${enabledList}`);
+
   // Fetch data and get cache status
   const data = await statusData.fetch();
-  const cacheStatus = data.cacheStatus.includes("HIT") ? `cache ${data.cacheStatus.split(" ")[0]}` : `cache ${data.cacheStatus.split(" ")[0]}`;
-  
-  console.log(`INFO | Stream request: ${reqId} | ${cacheStatus} | providers: ${enabledList}`);
 
   if (data.hasData) {
     for (const r of data.results) {
