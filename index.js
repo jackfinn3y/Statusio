@@ -754,13 +754,24 @@ function fetchStatusData(cfg) {
     enabled,
     async fetch() {
       if (cached) {
+        console.log(`INFO | Cache HIT (age: ${cached.ageStr}, expires in: ${cached.remainingStr})`);
+        // Log cached provider info
+        for (const r of cached.value) {
+          if (r.premium !== null || r.username) {
+            const user = r.username ? `@${r.username}` : "unknown";
+            const days = Number.isFinite(r.daysLeft) && r.daysLeft !== null ? r.daysLeft : r.premium ? "—" : 0;
+            const status = typeof days === "number" ? (days <= 0 ? "Expired" : days <= 3 ? "Critical" : days <= 14 ? "Warning" : "OK") : "OK";
+            console.log(`INFO | ${r.name}: ${user}, ${days} days left (${status}) [cached]`);
+          }
+        }
         return {
           results: cached.value,
-          cacheStatus: `HIT (age: ${cached.ageStr}, expires in: ${cached.remainingStr})`,
           enabled,
           hasData: cached.value.some((r) => r.premium !== null || r.username),
         };
       }
+
+      console.log(`INFO | Cache MISS (TTL: ${cacheMin}min)`);
 
       try {
         const jobs = [];
