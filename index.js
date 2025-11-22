@@ -853,25 +853,18 @@ builder.defineStreamHandler(async (args) => {
     cfg = rawCfg;
   }
 
-  const statusData = await fetchStatusData(cfg);
+  const dataFetcher = fetchStatusData(cfg);
 
   if (!Object.values(dataFetcher.enabled).some((v) => v)) {
     console.log("WARN | No providers configured");
     return { streams: [] };
   }
 
-  const enabledList = Object.entries(dataFetcher.enabled)
-    .filter(([, v]) => v)
-    .map(([k]) => k)
-    .join(", ");
-
   const showErrors = cfg.show_errors !== "false"; // default true
   const streams = [];
   const errorStreams = [];
 
-  console.log(`INFO | Stream request: ${reqId} | providers: ${enabledList}`);
-
-  const dataFetcher = fetchStatusData(cfg);
+  console.log(`INFO | Stream request: ${reqId}`);
   
   // Fetch data (cache status will be logged inside fetch)
   const data = await dataFetcher.fetch();
@@ -928,6 +921,9 @@ builder.defineStreamHandler(async (args) => {
 // ------------------------------ Server -------------------------------------
 const PORT = Number(process.env.PORT || 7042);
 
+console.log(`INFO | Statusio v1.2.0 started on port ${PORT}`);
+console.log("INFO | Showing only critical (≤3 days) or expired subscriptions");
+
 // Suppress SDK's HTTP message
 const originalLog = console.log;
 console.log = () => {}; // Temporarily disable all console.log
@@ -935,9 +931,6 @@ console.log = () => {}; // Temporarily disable all console.log
 serveHTTP(builder.getInterface(), { port: PORT, hostname: "0.0.0.0" });
 
 console.log = originalLog; // Restore console.log
-
-console.log(`INFO | Statusio v1.2.0 started on port ${PORT}`);
-console.log("INFO | Showing only critical (≤3 days) or expired subscriptions");
 
 // Warm cache after server starts
 warmCache();
