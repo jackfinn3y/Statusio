@@ -784,13 +784,12 @@ async function fetchStatusData(cfg) {
         
         return {
           results,
-          cacheStatus: `MISS (TTL: ${cacheMin}min)`,
           enabled,
           hasData: results.some((r) => r.premium !== null || r.username),
         };
       } catch (e) {
         console.error("ERROR | Error fetching provider data:", e);
-        return { error: e.message, results: [], cacheStatus: "ERROR", enabled, hasData: false };
+        return { error: e.message, results: [], enabled, hasData: false };
       }
     }
   };
