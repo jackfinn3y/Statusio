@@ -935,13 +935,12 @@ const PORT = Number(process.env.PORT || 7042);
 console.log(`INFO | Statusio v1.2.0 started on port ${PORT}`);
 console.log("INFO | Showing only critical (≤3 days) or expired subscriptions");
 
-// Suppress SDK's HTTP message
-const originalLog = console.log;
-console.log = () => {}; // Temporarily disable all console.log
+// This completely suppresses the "HTTP addon accessible at: ..." message
+serveHTTP(builder.getInterface(), {
+  port: PORT,
+  hostname: "0.0.0.0",
+  quiet: true          // ← This is all you need
+});
 
-serveHTTP(builder.getInterface(), { port: PORT, hostname: "0.0.0.0" });
-
-console.log = originalLog; // Restore console.log
-
-// Warm cache after server starts
+// Warm cache after the server is running
 warmCache();
